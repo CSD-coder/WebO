@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>WebO/Camera</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  body {
+    margin: 0;
+    background: black;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+    color: white;
+  }
+
+  video, canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+  }
+
+  #topBar {
+    position: absolute;
+    top: 20px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 10;
+  }
+
+  #topBar button {
+    background: none;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 50px;
+    color: white;
+    font-size: 50px;
+    cursor: pointer;
+  }
+
+  #bottomBar {
+    position: absolute;
+    bottom: 30px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  #captureBtn {
+    width: 250px;
+    height: 250px;
+    background: white;
+    border-radius: 50%;
+    border: 6px solid black;
+    cursor: pointer;
+  }
+
+  #previewControls {
+    position: absolute;
+    bottom: 40px;
+    width: 100%;
+    display: none;
+    justify-content: space-around;
+    z-index: 20;
+  }
+
+  #previewControls button {
+    background: rgba(0,0,0,0.6);
+    border: none;
+    padding: 12px 20px;
+    border-radius: 12px;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+  }
+  #back {
+    color: white;
+    background: none;
+    border: none;
+    font-size: 50px;
+  }
+</style>
+</head>
+
+<body>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas" style="display:none;"></canvas>
+
+<div id="topBar">
+  <button id="flashBtn">⚡</button>
+  <button id="galleryBtn">🖼️</button>
+  <button id="switchBtn">🔄</button>
+</div>
+
+<div id="bottomBar">
+  <button id="back" onclick="location.href='index.html'">◀</button>
+  <div id="captureBtn"></div>
+</div>
+
+<div id="previewControls">
+  <button id="retakeBtn">Retake</button>
+  <button id="saveBtn">Save</button>
+</div>
+
+<script>
+const supabase = supabase.createClient(
+  "https://nctodmmcdxvaelegsykw.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jdG9kbW1jZHh2YWVsZWdzeWt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTI3MTksImV4cCI6MjA5NjMyODcxOX0.PAM3uQGwN1KwFZzyeULWeuyOGMti1ezoIf25b5j0bvw"
+);
+
+window.onload = () => {
+
+let video = document.getElementById("video");
+let canvas = document.getElementById("canvas");
+let ctx = canvas.getContext("2d");
+
+let currentFacing = "environment";
+let stream = null;
+let track = null;
+let flashOn = false;
+
+async function startCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: currentFacing }
+  });
+
+  video.srcObject = stream;
+  track = stream.getVideoTracks()[0];
+
+  setupFlash();
+}
+
+function setupFlash() {
+  const caps = track.getCapabilities();
+  const flashBtn = document.getElementById("flashBtn");
+
+  flashBtn.style.display = caps.torch ? "block" : "none";
+}
+
+document.getElementById("flashBtn").onclick = () => {
+  flashOn = !flashOn;
+  track.applyConstraints({ advanced: [{ torch: flashOn }] });
+};
+
+document.getElementById("switchBtn").onclick = () => {
+  currentFacing = currentFacing === "environment" ? "user" : "environment";
+  startCamera();
+};
+
+document.getElementById("captureBtn").onclick = () => {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
+
+  video.style.display = "none";
+  canvas.style.display = "block";
+
+  document.getElementById("bottomBar").style.display = "none";
+  document.getElementById("previewControls").style.display = "flex";
+};
+
+document.getElementById("retakeBtn").onclick = () => {
+  canvas.style.display = "none";
+  video.style.display = "block";
+
+  document.getElementById("bottomBar").style.display = "flex";
+  document.getElementById("previewControls").style.display = "none";
+};
+
+document.getElementById("saveBtn").onclick = async () => {
+  const dataURL = canvas.toDataURL("image/png");
+  const blob = await (await fetch(dataURL)).blob();
+
+  const fileName = `uploads/photo_${Date.now()}.png`;
+
+  const { error } = await supabase.storage
+    .from("photos")
+    .upload(fileName, blob, {
+      contentType: "image/png",
+      upsert: false
+    });
+
+  if (error) {
+    alert("Upload failed: " + error.message);
+    return;
+  }
+
+  alert("Photo saved!");
+};
+
+document.getElementById("galleryBtn").onclick = async () => {
+  const gallery = document.getElementById("gallery");
+  const content = document.getElementById("galleryContent");
+
+  content.innerHTML = "";
+
+  const { data: files, error } = await supabase.storage
+    .from("photos")
+    .list("uploads", { limit: 100 });
+
+  if (error) {
+    alert("Error loading gallery: " + error.message);
+    return;
+  }
+
+  for (const file of files) {
+    const { data: urlData } = supabase.storage
+      .from("photos")
+      .getPublicUrl(`uploads/${file.name}`);
+
+    const img = document.createElement("img");
+    img.src = urlData.publicUrl;
+    img.style.width = "100%";
+    img.style.borderRadius = "12px";
+
+    content.appendChild(img);
+  }
+
+  gallery.style.display = "block";
+};
+
+document.getElementById("closeGallery").onclick = () => {
+  document.getElementById("gallery").style.display = "none";
+};
+
+startCamera();
+
+};
+</script>
+
+<div id="gallery" style="
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background: black;
+  overflow-y: scroll;
+  display: none;
+  padding: 20px;
+  z-index: 999;
+">
+  <button id="closeGallery" style="
+    font-size: 50px;
+    background: none;
+    border: none;
+    color: white;
+    margin-bottom: 20px;
+  ">✖</button>
+
+  <div id="galleryContent" style="
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  "></div>
+</div>
+
+</body>
+</html>
