@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WebO/Notes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f4f4;
+      --text: #333;
+      --card: #fff;
+      --accent: grey;
+      --danger: crimson;
+    }
+    body.dark {
+      --bg: #1e1e1e;
+      --text: #eee;
+      --card: #2c2c2c;
+      --accent: grey;
+      --danger: #ff4d4d;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 1em;
+      background: var(--bg);
+      color: var(--text);
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+      transition: background 0.3s, color 0.3s;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    input, textarea, button {
+      width: 100%;
+      margin: 0.5em 0;
+      padding: 0.6em;
+      font-size: 1em;
+      box-sizing: border-box;
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid #ccc;
+    }
+    button {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: lightgrey;
+      color: black;
+    }
+    #journalList li {
+      margin: 0.5em 0;
+      padding: 0.5em;
+      background: var(--card);
+      border: 1px solid #ccc;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      border-radius: 70px;
+      padding-top: 20px;
+      padding-bottom: 20px;
+      text-align: center;
+    }
+    .journal-name {
+      color: #007BFF;
+      cursor: pointer;
+      text-decoration: underline;
+      flex: 1;
+    }
+    .timestamp {
+      font-size: 0.9em;
+      color: #666;
+      margin-left: 1em;
+    }
+    .delete-btn {
+      background-color: var(--danger);
+      color: white;
+      border: none;
+      padding: 0.3em 0.6em;
+      border-radius: 3px;
+      cursor: pointer;
+      border-radius: 50px;
+      padding-left: 10px;
+      padding-top: 10px;
+      padding-bottom: 10px;
+      padding-right: 10px;
+    }
+    #status {
+      margin-top: 1em;
+      font-weight: bold;
+      text-align: center;
+    }
+    #darkToggle {
+      margin: 1em auto;
+      display: block;
+      width: fit-content;
+    }
+    #back {
+      margin: 1em auto;
+      display: block;
+      width: fit-content;
+      background-color: var(--none);
+      color: black;
+    }
+    #back:hover {
+      cursor: pointer;
+    }
+    @media (max-width: 600px) {
+      body {
+        margin: 0.5em;
+      }
+      .timestamp {
+        margin-left: 0;
+        margin-top: 0.5em;
+        width: 100%;
+      }
+    }
+    textarea {
+      border-radius: 80px;
+      padding-left: 40px;
+      padding-top: 20px;
+      padding-bottom: 20px;
+      margin-right: 15px;
+    }
+    .textareaElement {
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+   nav {
+      display: flex;
+    }
+footer {
+color:gold;
+}
+  </style>
+</head>
+<body>
+<nav>
+  <button id="back" onclick="location.href='index.html'">◀</button>
+
+  <h1>Notes</h1>
+ 
+  <button id="darkToggle" onclick="toggleDarkMode()">Dark/Light Mode</button>
+  </nav>
+  
+  <div class="textareaElement" contenteditable>
+  <textarea id="journal" rows="10" placeholder="Write here..."></textarea>
+  </div>
+  
+  <button onclick="saveJournal()">💾 (Save)</button>
+  <button onclick="exportJournal()">📤 (Export)</button>
+  <div id="status"></div>
+
+  <h2>Saved Notes</h2>
+  <ul id="journalList"></ul>
+
+<script>
+    const SECRET_KEY = "my_hidden_encryption_key_123";
+    let currentPin = null;
+
+    // Generate an 8-digit PIN
+    function generatePin() {
+      return Math.floor(10000000 + Math.random() * 90000000).toString();
+    }
+
+    function saveJournal() {
+      const text = document.getElementById('journal').value.trim();
+
+      if (!text) {
+        alert('Please fill in your note');
+        return;
+      }
+
+      const pin = generatePin();
+      const encrypted = CryptoJS.AES.encrypt(text, SECRET_KEY).toString();
+
+      localStorage.setItem('journal_' + pin, encrypted);
+      localStorage.setItem('journal_' + pin + '_timestamp', new Date().toISOString());
+
+      currentPin = pin;
+      document.getElementById('status').textContent = `Saved (PIN: ${pin})`;
+      updateJournalList();
+    }
+
+    function updateJournalList() {
+      const list = document.getElementById('journalList');
+      list.innerHTML = '';
+
+      const keys = Object.keys(localStorage).filter(key =>
+        key.startsWith('journal_') && !key.endsWith('_timestamp')
+      );
+
+      keys.forEach(key => {
+        const pin = key.replace('journal_', '');
+        const timestamp = localStorage.getItem('journal_' + pin + '_timestamp');
+        const item = document.createElement('li');
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = `PIN: ${pin}`;
+        nameSpan.className = 'journal-name';
+        nameSpan.onclick = () => openJournal(pin);
+
+        const timeSpan = document.createElement('span');
+        timeSpan.textContent = `🕒 ${new Date(timestamp).toLocaleString()}`;
+        timeSpan.className = 'timestamp';
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.onclick = () => deleteJournal(pin);
+
+        item.appendChild(nameSpan);
+        item.appendChild(timeSpan);
+        item.appendChild(deleteBtn);
+        list.appendChild(item);
+      });
+    }
+
+    function openJournal(pin) {
+      const encrypted = localStorage.getItem('journal_' + pin);
+      if (!encrypted) {
+        alert('Note not found.');
+        return;
+      }
+
+      const decrypted = CryptoJS.AES.decrypt(encrypted, SECRET_KEY).toString(CryptoJS.enc.Utf8);
+      document.getElementById('journal').value = decrypted;
+      currentPin = pin;
+      document.getElementById('status').textContent = `Opened PIN: ${pin}`;
+    }
+
+    function deleteJournal(pin) {
+      if (confirm('Are you sure you want to permanently delete this note?')) {
+        localStorage.removeItem('journal_' + pin);
+        localStorage.removeItem('journal_' + pin + '_timestamp');
+        if (currentPin === pin) {
+          currentPin = null;
+          document.getElementById('journal').value = '';
+        }
+        updateJournalList();
+        document.getElementById('status').textContent = `Deleted PIN: ${pin}`;
+      }
+    }
+
+    function exportJournal() {
+      const text = document.getElementById('journal').value.trim();
+      if (!text) {
+        alert('Please open or write a note first.');
+        return;
+      }
+      const pin = currentPin || 'note';
+      const blob = new Blob([text], { type: 'text/plain' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = pin + '.txt';
+      link.click();
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark');
+    }
+
+    updateJournalList();
+</script>
+<footer>
+To GOD Be The Glory ¦ © 2026 CSD
+</footer>
+</body>
+</html>
