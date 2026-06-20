@@ -1,0 +1,49 @@
+body{
+  padding: 25px;
+  background-color: rgb(248, 246, 242);
+}
+.appz {
+	border: none;
+  border-radius: 100px;
+	width: 100px;
+	height: 100px;
+	background-color: white;
+  margin-left: 20px;
+}
+#apps {
+  display: flex;
+}
+.appz:hover {
+  cursor: pointer;
+}
+footer {
+  margin-top: 10px;
+  background-color: lightgrey;
+  border-radius: 100px;
+  text-align: center;
+  padding: 10px 10px 10px 10px;
+}
+footer:hover {
+  cursor: pointer;
+  background-color: white;
+}
+a {
+  color: grey;
+}
+a:hover {
+  color: black;
+}
+#web-o {
+  margin-top: 50%;
+  background-color: rgb(237, 184, 22);
+  text-align: center;
+  border-radius: 100px;
+  font-family: "Sofia", Courier New, Trebuchet MS, Brush Script MT, monospace;
+  padding: 5px 5px 5px 5px;
+  font-size: 150%;
+  align-items: center;
+}
+#web-o-rest {
+  font-family: Courier New, "Sofia", Trebuchet MS, Brush Script MT, monospace;
+  font-size: 100%;
+}
